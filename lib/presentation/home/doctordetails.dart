@@ -60,6 +60,26 @@ class _DoctorDetailsState extends State<DoctorDetails> {
     }
   }
 
+  Future<List<NurseService>> fetchNurseServicesByUid(String uid) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('nurse')
+          .where('uid', isEqualTo: uid)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) return [];
+
+      final data = snapshot.docs.first.data();
+      final List<dynamic> serviceList = data['services'] ?? [];
+
+      return serviceList.map((s) => NurseService.fromJson(s)).toList();
+    } catch (e) {
+      print("❌ Error fetching services: $e");
+      return [];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -138,7 +158,37 @@ class _DoctorDetailsState extends State<DoctorDetails> {
               ),
               const SizedBox(height: 24),
 
-              // Reviews Section
+              const SizedBox(height: 24),
+              Text("Services",
+                  style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 8),
+
+              FutureBuilder<List<NurseService>>(
+                future: fetchNurseServicesByUid(widget.nurse.uid),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  } else if (snapshot.hasError ||
+                      !snapshot.hasData ||
+                      snapshot.data!.isEmpty) {
+                    return const Text("No services available.");
+                  } else {
+                    return Column(
+                      children: snapshot.data!.map((service) {
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          child: ListTile(
+                            title: Text(service.serviceName),
+                            subtitle: Text("Duration: ${service.duration}"),
+                            trailing: Text("EGP ${service.price}"),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  }
+                },
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -179,6 +229,26 @@ class _DoctorDetailsState extends State<DoctorDetails> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class NurseService {
+  final String serviceName;
+  final int price;
+  final String duration;
+
+  NurseService({
+    required this.serviceName,
+    required this.price,
+    required this.duration,
+  });
+
+  factory NurseService.fromJson(Map<String, dynamic> json) {
+    return NurseService(
+      serviceName: json['service_name'] ?? '',
+      price: json['price'] ?? 0,
+      duration: json['duration'] ?? '',
     );
   }
 }
